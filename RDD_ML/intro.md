@@ -12,12 +12,13 @@ Memory: 32GB
 Follow the [Conda Installation user guide](https://docs.conda.io/projects/conda/en/latest/user-guide/install/linux.html)
 ### Step2: Setup environment
 Install cudatoolkit==11.8 with the [instruction](https://developer.nvidia.com/cuda-11-8-0-download-archive?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=22.04&target_type=runfile_local) \
-nano ~/.bashrc \
-export PATH=/usr/local/cuda-11.8/bin${PATH:+:${PATH}} \
-export LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}} \
-source ~/.bashrc \
+```
+nano ~/.bashrc
+export PATH=/usr/local/cuda-11.8/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:$LD_LIBRARY_PATH
+source ~/.bashrc
+```
 verify by: nvcc --version
-
 ```
 conda create --name RDD-dev python=3.10 -y
 conda activate RDD-dev
@@ -25,9 +26,9 @@ pip3 install torch torchvision torchaudio --index-url https://download.pytorch.o
 pip install cudatoolkit==11.8
 pip install -U openmim
 mim install mmengine
-mim install mmcv
+mim install mmcv==2.1.0
 git clone https://github.com/open-mmlab/mmdetection.git
-cd mmdetection
+cd RDD_ML/mmdetection
 pip install -v -e .
 cd ../
 conda install tqdm
@@ -71,16 +72,20 @@ wget https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_la
 cd ../
 tools/dist_train.sh configs/RDD/RDD_model.py 1
 ```
-# Model inference engine deployment guide
+# Model inference engine generation guide
 
-```angular2html
+```
 # make sure prerequisite already met, otherwise install pytorch, torchvision, cudatoolkit,mmengine, mmecv==2.1.0 at fisrt
 cd ../
 pip install mmdeploy==1.3.1
 pip install mmdeploy-runtime-gpu==1.3.1
 pip install netron
-# Then install Tensorrt==8.6.1.6, cudnn==8.5.0.96
-# Tensorrt download link: https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/secure/8.5.3/tars/TensorRT-8.5.3.1.Linux.x86_64-gnu.cuda-11.8.cudnn8.6.tar.gz
+# make sure prerequisite already met, otherwise install pytorch, torchvision, cudatoolkit,mmengine, mmecv==2.1.0 at fisrt
+cd ../
+pip install mmdeploy==1.3.1
+pip install mmdeploy-runtime-gpu==1.3.1
+pip install netron
+# Then install cudnn==8.5.0.96
 # cudnn download link: https://developer.nvidia.com/compute/cudnn/secure/8.5.0/local_installers/11.7/cudnn-linux-x86_64-8.5.0.96_cuda11-archive.tar.xz
 
 tar -xvJf cudnn-linux-x86_64-8.5.0.96_cuda11-archive.tar.xz
@@ -90,13 +95,6 @@ sudo cp include/cudnn*.h /usr/local/cuda-11.8/include
 sudo cp lib/libcudnn* /usr/local/cuda-11.8/lib64
 sudo chmod a+r /usr/local/cuda-11.8/include/cudnn*.h /usr/local/cuda-11.8/lib64/libcudnn*
 cd ../
-
-tar zxf TensorRT-8.6.1.6.Linux.x86_64-gnu.cuda-11.8.cudnn8.6.tar.gz
-nano ~/.bashrc \
-export TENSORRT_DIR=$(pwd)/TensorRT-8.6.1.6
-export LD_LIBRARY_PATH=${TENSORRT_DIR}/lib:$LD_LIBRARY_PATH
-source ~/.bashrc \
-
 sudo ldconfig
 # if some words appear after executing 'sudo ldconfig', such as ...is not a symbolic link, please refer to: https://queirozf.com/entries/installing-cuda-tk-and-tensorflow-on-a-clean-ubuntu-16-04-install#-sbin-ldconfig-real-usr-local-cuda-lib64-libcudnn-so-5-is-not-a-symbolic-link
 # possible quick solution:
@@ -109,19 +107,11 @@ pip install tensorrt==8.6.1
 
 git clone -b main --recursive https://github.com/open-mmlab/mmdeploy.git
 
-wget https://github.com/microsoft/onnxruntime/releases/download/v1.18.1/onnxruntime-linux-x64-gpu-1.18.1.tgz
-tar -zxvf onnxruntime-linux-x64-gpu-1.18.1.tgz
-nano ~/.bashrc \
-export ONNXRUNTIME_DIR=$(pwd)/onnxruntime-linux-x64-gpu-1.18.1
-export LD_LIBRARY_PATH=$ONNXRUNTIME_DIR/lib:$LD_LIBRARY_PATH
-source ~/.bashrc \
+mv detection_tensorrt-fp16_static-640x640.py mmdeploy/configs/mmdet/detection
 
-mv detection_tensorrt-fp16_static-640x640.py mmdeploy/configs/mmdet/
-
-# when transferring torch model to tensorrt engine, might have error: failed:Fatal error: mmdeploy:xxx(-1) is not a registered function/op
-# please refer to: https://github.com/open-mmlab/mmdeploy/issues/2377
-# run 'session_options.register_custom_ops_library(${path/to/mmdeploy/lib/libmmdeploy_onnxruntime_ops.so})' for one time after converting to onnx 
-
+# when transferring torch model to tensorrt engine, might encounter with error: failed:Fatal error: mmdeploy:xxx(-1) is not a registered function/op
+# This may due to onnxruntime may not be installed correctly (not just pip install). please refer to: https://github.com/open-mmlab/mmdeploy/issues/2377
+# possible solution: run 'session_options.register_custom_ops_library(${path/to/mmdeploy/lib/libmmdeploy_onnxruntime_ops.so})' for one time after converting to onnx / verifying onnxruntime-gpu installation
 # torch to onnx
 python mmdeploy/tools/deploy.py \
     mmdeploy/configs/mmdet/detection/detection_onnxruntime_dynamic.py \
@@ -160,11 +150,7 @@ python mmdeploy/tools/deploy.py \
     --device cuda \
     --dump-info
 
-<!--python mmdeploy/tools/test.py \-->
-<!--    mmdeploy/configs/mmdet/detection/detection_tensorrt-fp16_static-640x640.py  \-->
-<!--    mmdetection/configs/RDD/RDD_model.py \-->
-<!--    &#45;&#45;model mmdeploy_model/swin-transformer-faster-rcnn-static/end2end.engine \-->
-<!--    &#45;&#45;device cuda:0-->
+
 ```
 
 
