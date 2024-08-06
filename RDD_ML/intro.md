@@ -23,11 +23,9 @@ verify by: nvcc --version
 conda create --name RDD-dev python=3.10 -y
 conda activate RDD-dev
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117
-pip install cudatoolkit==11.8
 pip install -U openmim
 mim install mmengine
 mim install mmcv==2.1.0
-git clone https://github.com/open-mmlab/mmdetection.git
 cd RDD_ML/mmdetection
 pip install -v -e .
 cd ../
@@ -80,21 +78,23 @@ cd ../
 pip install mmdeploy==1.3.1
 pip install mmdeploy-runtime-gpu==1.3.1
 pip install netron
-# make sure prerequisite already met, otherwise install pytorch, torchvision, cudatoolkit,mmengine, mmecv==2.1.0 at fisrt
-cd ../
-pip install mmdeploy==1.3.1
-pip install mmdeploy-runtime-gpu==1.3.1
-pip install netron
-# Then install cudnn==8.5.0.96
+# Then install cudnn==8.5.0.96, Tensorrt==8.6.1.6
 # cudnn download link: https://developer.nvidia.com/compute/cudnn/secure/8.5.0/local_installers/11.7/cudnn-linux-x86_64-8.5.0.96_cuda11-archive.tar.xz
-
+# Tensorrt download linl:https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/secure/8.6.1/tars/TensorRT-8.6.1.6.Linux.x86_64-gnu.cuda-11.8.tar.gz
 tar -xvJf cudnn-linux-x86_64-8.5.0.96_cuda11-archive.tar.xz
-# When installing cudnn, we might need:
 cd /cudnn-linux-x86_64-8.5.96_cuda11-archive
 sudo cp include/cudnn*.h /usr/local/cuda-11.8/include
 sudo cp lib/libcudnn* /usr/local/cuda-11.8/lib64
 sudo chmod a+r /usr/local/cuda-11.8/include/cudnn*.h /usr/local/cuda-11.8/lib64/libcudnn*
 cd ../
+
+tar -xzvf TensorRT-8.6.1.6.Linux.x86_64-gnu.cuda-11.8.tar.gz
+sudo mv TensorRT-8.6.1.6 /usr/local/TensorRT-8.6.1
+nano ~/.bashrc
+export PATH=/usr/local/cuda-11.8/bin:/usr/local/TensorRT-8.6.1/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:/usr/local/TensorRT-8.6.1/lib:$LD_LIBRARY_PATH
+source ~/.bashrc
+
 sudo ldconfig
 # if some words appear after executing 'sudo ldconfig', such as ...is not a symbolic link, please refer to: https://queirozf.com/entries/installing-cuda-tk-and-tensorflow-on-a-clean-ubuntu-16-04-install#-sbin-ldconfig-real-usr-local-cuda-lib64-libcudnn-so-5-is-not-a-symbolic-link
 # possible quick solution:
@@ -108,6 +108,9 @@ pip install tensorrt==8.6.1
 git clone -b main --recursive https://github.com/open-mmlab/mmdeploy.git
 
 mv detection_tensorrt-fp16_static-640x640.py mmdeploy/configs/mmdet/detection
+
+wget https://github.com/microsoft/onnxruntime/releases/download/v1.18.1/onnxruntime-linux-x64-gpu-1.18.1.tgz
+tar -zxvf onnxruntime-linux-x64-gpu-1.18.1.tgz
 
 # when transferring torch model to tensorrt engine, might encounter with error: failed:Fatal error: mmdeploy:xxx(-1) is not a registered function/op
 # This may due to onnxruntime may not be installed correctly (not just pip install). please refer to: https://github.com/open-mmlab/mmdeploy/issues/2377
