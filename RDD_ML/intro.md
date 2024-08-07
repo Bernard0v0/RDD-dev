@@ -12,13 +12,13 @@ Memory: 32GB
 Follow the [Conda Installation user guide](https://docs.conda.io/projects/conda/en/latest/user-guide/install/linux.html)
 ### Step2: Setup environment
 Install cudatoolkit==11.8 with the [instruction](https://developer.nvidia.com/cuda-11-8-0-download-archive?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=22.04&target_type=runfile_local) \
+Installation can be verified by: nvcc --version
 ```
 nano ~/.bashrc
 export PATH=/usr/local/cuda-11.8/bin:$PATH
 export LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:$LD_LIBRARY_PATH
 source ~/.bashrc
 ```
-verify by: nvcc --version
 ```
 conda create --name RDD-dev python=3.10 -y
 conda activate RDD-dev
@@ -72,67 +72,63 @@ tools/dist_train.sh configs/RDD/RDD_model.py 1
 ```
 # Model inference engine generation guide
 
+1. Make sure prerequisite already met, otherwise follow the Step3 of model training above to initialise the env at first.
+2. Download mmdeploy related library
 ```
-# make sure prerequisite already met, otherwise install pytorch, torchvision, cudatoolkit,mmengine, mmecv==2.1.0 at fisrt
 cd ../
 pip install mmdeploy==1.3.1
 pip install mmdeploy-runtime-gpu==1.3.1
-pip install netron
-# Then install cudnn==8.5.0.96, Tensorrt==8.6.1.6
-# cudnn download link: https://developer.nvidia.com/compute/cudnn/secure/8.5.0/local_installers/11.7/cudnn-linux-x86_64-8.5.0.96_cuda11-archive.tar.xz
-# Tensorrt download linl:https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/secure/8.6.1/tars/TensorRT-8.6.1.6.Linux.x86_64-gnu.cuda-11.8.tar.gz
+```
+3. Install [cudnn==8.5.0.96](https://developer.nvidia.com/compute/cudnn/secure/8.5.0/local_installers/11.7/cudnn-linux-x86_64-8.5.0.96_cuda11-archive.tar.xz), and [Tensorrt==8.6.1.6](https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/secure/8.6.1/tars/TensorRT-8.6.1.6.Linux.x86_64-gnu.cuda-11.8.tar.gz) archive(tar) manually, and put it in RDD_ML directory. \
+Then install it and set env variables.
+```
 tar -xvJf cudnn-linux-x86_64-8.5.0.96_cuda11-archive.tar.xz
 cd /cudnn-linux-x86_64-8.5.96_cuda11-archive
 sudo cp include/cudnn*.h /usr/local/cuda-11.8/include
 sudo cp lib/libcudnn* /usr/local/cuda-11.8/lib64
 sudo chmod a+r /usr/local/cuda-11.8/include/cudnn*.h /usr/local/cuda-11.8/lib64/libcudnn*
 cd ../
-
+pip install tensorrt==8.6.1
 tar -xzvf TensorRT-8.6.1.6.Linux.x86_64-gnu.cuda-11.8.tar.gz
 sudo mv TensorRT-8.6.1.6 /usr/local/TensorRT-8.6.1
 nano ~/.bashrc
 export PATH=/usr/local/cuda-11.8/bin:/usr/local/TensorRT-8.6.1/bin:$PATH
 export LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:/usr/local/TensorRT-8.6.1/lib:$LD_LIBRARY_PATH
 source ~/.bashrc
-
+```
+4. Verify installation by:
+```
 sudo ldconfig
-# if some words appear after executing 'sudo ldconfig', such as ...is not a symbolic link, please refer to: https://queirozf.com/entries/installing-cuda-tk-and-tensorflow-on-a-clean-ubuntu-16-04-install#-sbin-ldconfig-real-usr-local-cuda-lib64-libcudnn-so-5-is-not-a-symbolic-link
-# possible quick solution:
-# sudo rm /usr/local/cuda-12.1/targets/x86_64-linux/lib/libcudnn*.so.8
-# sudo ln -s /usr/local/cuda-12.1/targets/x86_64-linux/lib/libcudnn_adv_infer.so.8.x.x /usr/local/cuda-12.1/targets/x86_64-linux/lib/libcudnn_adv_infer.so.8
-
+```
+If some warnings appear after executing 'sudo ldconfig', such as ...is not a symbolic link, please refer to the [link](https://queirozf.com/entries/installing-cuda-tk-and-tensorflow-on-a-clean-ubuntu-16-04-install#-sbin-ldconfig-real-usr-local-cuda-lib64-libcudnn-so-5-is-not-a-symbolic-link). \
+And a possible quick solution could be: (really depends on the detailed info received from **sudo ldconfig**)
+```
+sudo rm /usr/local/cuda-12.1/targets/x86_64-linux/lib/libcudnn*.so.8
+sudo ln -s /usr/local/cuda-12.1/targets/x86_64-linux/lib/libcudnn_adv_infer.so.8.x.x /usr/local/cuda-12.1/targets/x86_64-linux/lib/libcudnn_adv_infer.so.8
+```
+5. Install onnx related library
+```
 pip install onnxruntime-gpu
 pip install onnxconverter-common
-pip install tensorrt==8.6.1
-
+```
+6. Files preparation
+```
 git clone -b main --recursive https://github.com/open-mmlab/mmdeploy.git
-
 mv detection_tensorrt-fp16_static-640x640.py mmdeploy/configs/mmdet/detection
+```
+7. Weight convertion
 
-wget https://github.com/microsoft/onnxruntime/releases/download/v1.18.1/onnxruntime-linux-x64-gpu-1.18.1.tgz
-tar -zxvf onnxruntime-linux-x64-gpu-1.18.1.tgz
-
-# when transferring torch model to tensorrt engine, might encounter with error: failed:Fatal error: mmdeploy:xxx(-1) is not a registered function/op
-# This may due to onnxruntime may not be installed correctly (not just pip install). please refer to: https://github.com/open-mmlab/mmdeploy/issues/2377
-# possible solution: run 'session_options.register_custom_ops_library(${path/to/mmdeploy/lib/libmmdeploy_onnxruntime_ops.so})' for one time after converting to onnx / verifying onnxruntime-gpu installation
+```
 # torch to onnx
 python mmdeploy/tools/deploy.py \
     mmdeploy/configs/mmdet/detection/detection_onnxruntime_dynamic.py \
     mmdetection/configs/RDD/RDD_model.py \
     mmdetection/checkpoints/RDD1.pth \
     datasets/RDD2022/demo.jpg \
-    --work-dir mmdeploy_model/faster-rcnn \
+    --work-dir mmdeploy_model/swin-transformer-faster-rcnn-onnx-cpu \
     --device cpu \
     --dump-info
 
-python mmdeploy/tools/deploy.py \
-    mmdeploy/configs/mmdet/detection/detection_onnxruntime_static.py \
-    mmdetection/configs/RDD/RDD_model.py \
-    mmdetection/checkpoints/RDD1.pth \
-    datasets/RDD2022/demo.jpg \
-    --work-dir mmdeploy_model/faster-rcnn-static\
-    --device cpu \
-    --dump-info
 
 #torch to tensorrt
 python mmdeploy/tools/deploy.py \
@@ -140,7 +136,7 @@ python mmdeploy/tools/deploy.py \
     mmdetection/configs/RDD/RDD_model.py \
     mmdetection/checkpoints/RDD1.pth \
     datasets/RDD2022/demo.jpg \
-    --work-dir mmdeploy_model/swin-transformer-faster-rcnn-static \
+    --work-dir mmdeploy_model/swin-transformer-faster-rcnn-trt-static \
     --device cuda \
     --dump-info
 
@@ -149,11 +145,14 @@ python mmdeploy/tools/deploy.py \
     mmdetection/configs/RDD/RDD_model.py \
     mmdetection/checkpoints/RDD1.pth \
     datasets/RDD2022/demo.jpg \
-    --work-dir mmdeploy_model/swin-transformer-faster-rcnn-dynamic \
+    --work-dir mmdeploy_model/swin-transformer-faster-rcnn-trt-dynamic \
     --device cuda \
     --dump-info
 
 
 ```
-
+### Troubleshooting
+- When transferring torch model to tensorrt engine, might encounter with error: failed:Fatal error: mmdeploy:xxx(-1) is not a registered function/op \
+Please refer to the [github issue](https://github.com/open-mmlab/mmdeploy/issues/2377). \
+possible solution: run 'session_options.register_custom_ops_library(${path/to/mmdeploy/lib/libmmdeploy_onnxruntime_ops.so})' for one time after converting to onnx.
 
