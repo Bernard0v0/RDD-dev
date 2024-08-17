@@ -95,6 +95,7 @@ nano ~/.bashrc
 export PATH=/usr/local/cuda-11.8/bin:/usr/local/TensorRT-8.6.1/bin:$PATH
 export LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:/usr/local/TensorRT-8.6.1/lib:$LD_LIBRARY_PATH
 source ~/.bashrc
+conda activate RDD-dev
 ```
 4. Verify installation by:
 ```
@@ -110,6 +111,8 @@ sudo ln -s /usr/local/cuda-12.1/targets/x86_64-linux/lib/libcudnn_adv_infer.so.8
 ```
 pip install onnxruntime-gpu
 pip install onnxconverter-common
+https://github.com/microsoft/onnxruntime/releases/download/v1.18.1/onnxruntime-linux-x64-gpu-1.18.1.tgz
+tar -zxvf onnxruntime-linux-x64-gpu-1.18.1.tgz
 ```
 6. Files preparation
 ```
