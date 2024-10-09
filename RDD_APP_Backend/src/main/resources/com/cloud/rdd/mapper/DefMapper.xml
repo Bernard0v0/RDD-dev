@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0.3//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cloud.rdd.mapper.DefMapper">
+    <select id="getDefList" resultType="Integer">
+        SELECT
+id
+        FROM def
+        WHERE delete_flag = 'N'
+        <if test="type != 'all'">
+            <choose>
+                <when test="type == 'crack'">
+                    AND def.type IN (0, 1, 2)
+                </when>
+                <when test="type == 'pothole'">
+                    AND def.type = 3
+                </when>
+            </choose>
+        </if>
+        <choose>
+            <when test="createdTime != null">
+                ORDER BY created_time ${createdTime}
+            </when>
+            <when test="updatedTime != null">
+                ORDER BY updated_time ${updatedTime}
+            </when>
+        </choose>
+    </select>
+
+</mapper>

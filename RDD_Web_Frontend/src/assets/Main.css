@@ -1,0 +1,15 @@
+.logo{
+    width: 60px;
+    height: 100%;
+}
+.logo img{
+    width: 100%;
+    height: 100%;
+}
+
+.gutter-box {
+    padding: 0.8rem 0;
+}
+body{
+    background-color: #f5f5f5;
+}

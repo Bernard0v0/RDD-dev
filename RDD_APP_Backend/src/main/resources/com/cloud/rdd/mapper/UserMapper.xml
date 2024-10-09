@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0.3//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cloud.rdd.mapper.UserMapper">
+    <select id="getUserList" resultType="com.cloud.rdd.pojo.User">
+        select * from user
+        <where>
+            <if test="level != null">
+                level = #{level}
+            </if>
+            <if test="prompt != null">
+                <if test="level != null">
+                    AND
+                </if>
+                (username LIKE CONCAT('%', #{prompt}, '%')
+                OR email LIKE CONCAT('%', #{prompt}, '%'))
+            </if>
+        </where>
+    </select>
+    <update id="update" parameterType="com.cloud.rdd.pojo.User">
+        UPDATE user
+        <set>
+            <if test="username != null">username = #{username},</if>
+            <if test="password != null">password = #{password},</if>
+            <if test="email != null">email = #{email},</if>
+            <if test="level != null">level = #{level},</if>
+            <if test="updatedTime != null">updated_time = #{updatedTime}</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+</mapper>

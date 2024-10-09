@@ -113,6 +113,13 @@ pip install onnxruntime-gpu
 pip install onnxconverter-common
 https://github.com/microsoft/onnxruntime/releases/download/v1.18.1/onnxruntime-linux-x64-gpu-1.18.1.tgz
 tar -zxvf onnxruntime-linux-x64-gpu-1.18.1.tgz
+sudo mv onnxruntime-linux-x64-gpu-1.18.1 /usr/local/
+cd /usr/local
+sudo mv onnxruntime-linux-x64-gpu-1.18.1 onnxruntime-gpu-1.18.1
+nano ~/.bashrc
+export PATH=/usr/local/onnxruntime-gpu-1.18.1/bin:/usr/local/onnxruntime-gpu-1.18.1/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/onnxruntime-gpu-1.18.1/lib64:/usr/local/onnxruntime-gpu-1.18.1/lib:$LD_LIBRARY_PATH
+source ~/.bashrc
 ```
 6. Files preparation
 ```
