@@ -16,6 +16,7 @@ import {
 import defectstore from "../store/defectstore";
 
 
+
 function findIdByCoordinates(latitude, longitude) {
     const result = detectionstore.detectionList.find(
         item => Number(item.latitude) === Number(latitude) && Number(item.longitude) === Number(longitude)
@@ -41,6 +42,7 @@ function DetectionList() {
     }
     useEffect(() => {
         routerstore.selectkey = '02'
+        
         detectionstore.getDetectionList()
         detectionstore.getDefectList()
         defectstore.defectInfo = {}
@@ -162,7 +164,7 @@ function DetectionList() {
             if (record.stat !== row.stat) {
                 await defectstore.updateStat(record.id, defectstore.mapStatToNum(row.stat))
             }
-            if (record.type !== row.type && routerstore.userLevel < 2) {
+            if (record.type !== row.type && routerstore.level < 2) {
                 await defectstore.updateType(record.id, defectstore.mapTypeToNum(row.type))
             }
             setEditingKey('')
@@ -195,14 +197,14 @@ function DetectionList() {
             title: 'Defect Type',
             dataIndex: 'type',
             width: '15%',
-            editable: routerstore.userLevel < 2,
+            editable: routerstore.level < 2,
         },
         {
             title: 'Status',
             dataIndex: 'stat',
             render: (stat) => <Badge status={defectstore.mapStat(stat)} text={stat} />,
             width: '15%',
-            editable: routerstore.userLevel < 3,
+            editable: routerstore.level < 3,
         },
         {
             title: 'Updated By',
@@ -244,7 +246,7 @@ function DetectionList() {
                     }} onClick={() => edit(record)}>
                         <EditOutlined />Edit
                     </Typography.Link>
-                    <Typography.Link type={'danger'} style={{ display: routerstore.userLevel < 2 ? 'inline-block' : 'none' }} disabled={editingKey !== ''}>
+                    <Typography.Link type={'danger'} style={{ display: routerstore.level < 2 ? 'inline-block' : 'none' }} disabled={editingKey !== ''}>
                         <Popconfirm title="Sure to delete this defect?" onConfirm={() => defectstore.deleteDefect(record)}>
                             <DeleteOutlined />Delete defect
                         </Popconfirm>
@@ -303,7 +305,7 @@ function DetectionList() {
                     <Typography.Link style={{
                         marginInlineEnd: 10,
                     }} onClick={() => navto(record.id)}> <UnorderedListOutlined />Detail</Typography.Link>
-                    <Typography.Link type={'danger'} style={{ display: routerstore.userLevel < 2 ? 'inline-block' : 'none' }}>
+                    <Typography.Link type={'danger'} style={{ display: routerstore.level < 2 ? 'inline-block' : 'none' }}>
                         <Popconfirm title="Sure to delete this detection?" onConfirm={() => detectionstore.deleteDetection(record.id)}>
                             <DeleteOutlined />Delete detection
                         </Popconfirm>

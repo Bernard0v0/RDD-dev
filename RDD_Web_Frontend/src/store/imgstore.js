@@ -1,43 +1,28 @@
-import axios from "axios";
+
 import { message } from "antd";
-import { instance } from "./Axios";
 import { makeAutoObservable, runInAction } from "mobx";
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+
 
 class imgstore {
-    latitude = 0
-    longitude = 0
-    presignedUrl = ''
-
-    async getPresignedUrl(objectkey) {
-        const url = `/img/generate-presigned-url?bucketName=xxx&objectKey=${objectkey}`
-        const resp = await instance.get(url)
-        runInAction(() => {
-            this.presignedUrl = resp.data.data
-        })
-    }
+    s3Client = new S3Client({
+        region: 'region',
+        credentials: {
+            accessKeyId: process.env.REACT_APP_ACCESS_KEY_ID,
+            secretAccessKey: process.env.REACT_APP_AWS_SECRET_ACCESS_KEY,
+            sessionToken: process.env.REACT_APP_AWS_SESSION_TOKEN,
+        },
+    });
     async Upload(params, file) {
         try {
-            await this.getPresignedUrl(params['Key'])
-            console.log(this.presignedUrl)
-            await axios.put(this.presignedUrl, params['Body'])
-            message.success(`upload successfully`);
-            const formData = new FormData();
-            formData.append('latitude', this.latitude);
-            formData.append('longitude', this.longitude);
-            formData.append('imgSourceUrl', `xxx/${params['Key']}`);
-
-            const url = "/img/update";
-            const resp = await instance.post(url, formData);
-            runInAction(() => {
-                if (resp.data.code === 0) {
-                    message.success(`${file.name} Detect successfully`);
-                }
-                else {
-                    message.error(resp.data.message)
-                }
-            })
+            for (let index = 0; index < 1; index++) {
+                await this.s3Client.send(new PutObjectCommand(params));
+                console.log("submit:",index)
+            }
+            message.success('File uploaded successfully');
         } catch (error) {
-            message.error(`${file.name} failed to upload, connection lost`)
+            message.error(`${file.name} failed to upload`)
+            console.log(error)
         }
     }
     constructor() {

@@ -4,13 +4,11 @@ import { Button, Form, Input } from 'antd';
 import routerstore from "../store/routerstore.js";
 import { useNavigate } from "react-router-dom";
 import Logo from '../assets/logo.jpg'
-import axios from "axios";
-import userstore from "../store/userstore";
-import { makeAutoObservable, runInAction } from 'mobx';
+import userstore from "../store/userstore.js";
 function Login() { 
     const nav = useNavigate()
     const onFinish = () => {
-        window.location.href = "xxx";
+        window.location.href = "cognito_hostedui_url";
     };
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);

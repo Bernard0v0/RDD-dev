@@ -12,15 +12,14 @@ import time
 import boto3
 import uuid
 import numpy as np
-import onnx
-import onnxruntime as rt
 import json
+import threading
 app = Flask(__name__)
 db = SQLAlchemy()
 def get_secret():
 
-    secret_name = "xxx"
-    region_name = "xxx"
+    secret_name = "secret_name"
+    region_name = "region_name"
 
     # Create a Secrets Manager client
     session = boto3.session.Session()
@@ -96,29 +95,49 @@ class Det(db.Model):
 
 # S3 config
 s3 = boto3.resource(service_name='s3',
-                    region_name='xxx',
+                    region_name='region_name'
                     )
 
 
-def update_det(id,new_url,def_num):
+sqs = boto3.client('sqs',region_name='region_name')
+
+# SQS queue URL
+queue_url = 'sqs_url'
+def update_det(id,new_url,def_num,session):
     det = Det.query.get(id)
     det.img_url = new_url
     det.def_num = def_num
     det.detect_flag = 'Y'
     det.updated_by = "RDD inference engine"
     det.updated_time = datetime.now()
-    db.session.flush()
-def update_det_url(id,new_url):
+    session.flush()
+def update_det_url(id,new_url,session):
     det = Det.query.get(id)
     det.img_url = new_url
     det.updated_time = datetime.now()
-    db.session.flush()
-def update_def_url(id,new_url):
+    session.flush()
+def update_def_url(id,new_url,session):
     defect = Def.query.get(id)
     defect.img_url = new_url
     defect.updated_time = datetime.now()
-    db.session.flush()
-def insert_def(data):
+    session.flush()
+
+def insert_det(img_source_url,latitude,longitude,created_by,session):
+    det = Det(
+               img_source_url=img_source_url,
+                latitude=float(latitude),
+                longitude=float(longitude),
+                detect_flag='N',
+                delete_flag='N',
+                created_by=created_by,
+                created_time = datetime.now(),
+                updated_by = "RDD inference engine",
+                updated_time = datetime.now()
+            )
+    session.add(det)
+    session.flush()
+    return det.id
+def insert_def(data,session):
     new_def = Def(
         img_id=data['img_id'],
         img_url='',
@@ -135,14 +154,14 @@ def insert_def(data):
         updated_by="RDD inference engine",
         updated_time=datetime.now()
     )
-    db.session.add(new_def)
-    db.session.flush()
+    session.add(new_def)
+    session.flush()
     return new_def.id
-def delete_det(id):
+def delete_det(id,session):
     det = Det.query.get(id)
     if det:
-        db.session.delete(det)
-        db.session.flsuh()
+        session.delete(det)
+        session.flush()
 def get_def(img_id):
     results = Def.query.filter_by(img_id=img_id, delete_flag='N').all()
     def_list = []
@@ -193,45 +212,66 @@ def get_img_source_url(img_id):
 def get_img_url(img_id):
     return Det.query.with_entities(Det.img_url).filter_by(id=img_id).first()[0]
 
-# image detection request
-@app.route('/ml/img_detection', methods=['POST'])
-def detect():
+def process_sqs_messages():
+    with app.app_context():
+        while True:
+            try:
+                session = db.session
+                response = sqs.receive_message(
+                    QueueUrl=queue_url,
+                    MaxNumberOfMessages=1,
+                    WaitTimeSeconds=10
+                )
+                messages = response.get('Messages', [])
+                if not messages:
+                    continue
+
+                for message in messages:
+                    receipt_handle = message['ReceiptHandle']
+                    body = json.loads(message['Body'])
+                    print(body)
+                    res = detect(body['imageSourceUrl'],body['latitude'],body['longitude'],body['createdBy'],session)
+                    if res == "success":
+                        sqs.delete_message(
+                            QueueUrl=queue_url,
+                            ReceiptHandle=receipt_handle
+                        )
+            except Exception as e:
+                print(f"Error processing SQS message: {e}")
+                sqs.delete_message(
+                    QueueUrl=queue_url,
+                    ReceiptHandle=receipt_handle
+                )
+
+def detect(img_source_url,latitude,longitude,created_by,session):
     uploaded_files = []  # record the uploaded images to S3
     try:
-        with db.session.begin():
-            # set model output
-            outputs_name = ['dets', 'labels']
+        with session.begin():
+            img_id = insert_det(img_source_url,latitude,longitude,created_by,session)
 
-            # fetch the image from the provided URL
-            data = request.json
-            img_id = data.get('id')
-            img_source_url = data.get('img_source_url')
-            response = requests.get(img_source_url)
-            response.raise_for_status()
-            image_array = np.asarray(bytearray(response.content), dtype=np.uint8)
-            img = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
-
-            # get original image name
             origion_source_name = os.path.basename(img_source_url)
 
             coords = []
             scores = []
             cat_id = []
+
             # collect result resize result coord back to the original size
             response = requests.get(img_source_url)
             response.raise_for_status()
             image_array = np.asarray(bytearray(response.content), dtype=np.uint8)
             img = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
             single_img = img.copy()
+
             bboxes, labels, _ = detector(img)
             indices = [i for i in range(len(bboxes))]
             for index, bbox, label_id in zip(indices, bboxes, labels):
-                [left, top, right, bottom], score = bbox[:4], bbox[4]
+                [left, top, right, bottom], score = bbox[0:4].astype(int), bbox[4]
                 if score < 0.75:
                     continue
+                
                 coords.append([left, top, right, bottom])
                 scores.append(float(score))
-                cat_id.append(int(label_id))
+                cat_id.append(label_id)
 
             if coords:
                 unique_id = uuid.uuid4()
@@ -254,7 +294,7 @@ def detect():
                         "conf": scores[i],
                         "type": cat_id[i]
                     }
-                    def_id = insert_def(defect)
+                    def_id = insert_def(defect,session)
 
                     label = str(def_id)
                     (text_width, text_height), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, 0.6, 1)
@@ -268,45 +308,57 @@ def detect():
                     cv2.putText(single_img_c, label, text_org, cv2.FONT_HERSHEY_PLAIN, 0.8, (255, 255, 255), 0)
 
                     cv2.imwrite(single_file_name, single_img_c)
-                    s3.Bucket('xxx').upload_file(single_file_name, single_file_name, ExtraArgs={'ACL': 'public-read'})
-                    uploaded_files.append(single_file_name)  
-                    new_url = f"xxx/{single_file_name}"
-                    update_def_url(def_id, new_url)
+                    s3.Bucket('bucket_name').upload_file(single_file_name, single_file_name,
+                                                            ExtraArgs={'ACL': 'public-read'})
+                    uploaded_files.append(single_file_name)
+                    new_url = f"https://bucket_url/{single_file_name}"
+                    update_def_url(def_id, new_url,session)
                     os.remove(single_file_name)
 
                 cv2.imwrite(file_name, img)
-                s3.Bucket('xxx').upload_file(file_name, file_name, ExtraArgs={'ACL': 'public-read'})
+                s3.Bucket('bucket_name').upload_file(file_name, file_name, ExtraArgs={'ACL': 'public-read'})
                 uploaded_files.append(file_name)
-                new_url = f"xxx/{file_name}"
-                update_det(img_id, new_url, len(cat_id))
+                new_url = f"https://bucket_url/{file_name}"
+                update_det(img_id, new_url, len(cat_id),session)
                 os.remove(file_name)
 
-                return jsonify({"code": 0})
+                return "success"
             else:
-                delete_det(img_id)
-                s3.Object('xxx', origion_source_name).delete()
-                return jsonify({"code": 1})
+                delete_det(img_id,session)
+                s3.Object('bucket_name', origion_source_name).delete()
+                return "success"
 
     except Exception as e:
         # rollback database update
+        print(e)
         db.session.rollback()
-
+        delete_det(img_id,session)
         # rollback the uploaded images
         for file in uploaded_files:
             try:
-                s3.Object('xxx', file).delete()
+                s3.Object('bucket_name', file).delete()
             except Exception as s3_e:
                 app.logger.error(f"Failed to delete S3 object {file}: {s3_e}")
-        
-        return jsonify({"code": 1})
 
-    
-# img update request (update/delete defect)
+        return "failed"
+    finally:
+        session.remove()
+
+@app.route('/ml/health', methods=['GET'])
+def health_check():
+    response = app.response_class(
+        response=json.dumps({"status": "healthy"}),
+        status=200,
+        mimetype='application/json'
+    )
+    return response
+
 @app.route('/ml/update_img', methods=['POST'])
 def draw_img():
-    uploaded_files = []  # record the uploaded images to S3
+    uploaded_files = [] # record the uploaded images to S3
+    session = db.session
     try:
-        with db.session.begin():
+        with session.begin():
             # get the original image
             data = request.json
             img_id = data.get('id')
@@ -315,7 +367,7 @@ def draw_img():
             img_url = get_img_url(img_id)
             origion_name = os.path.basename(img_url)
 
-            s3.Object('xxx', origion_name).delete()
+            s3.Object('bucket_name', origion_name).delete()
 
             if data.get('del_mark') == "N":
                 response = requests.get(img_source_url)
@@ -340,10 +392,10 @@ def draw_img():
                     cv2.putText(img, label, text_org, cv2.FONT_HERSHEY_PLAIN, 0.8, (255, 255, 255), 0)
 
                 cv2.imwrite(file_name, img)
-                s3.Bucket('xxx').upload_file(file_name, file_name, ExtraArgs={'ACL': 'public-read'})
+                s3.Bucket('bucket_name').upload_file(file_name, file_name, ExtraArgs={'ACL': 'public-read'})
                 uploaded_files.append(file_name)
-                new_url = f"xxx/{file_name}"
-                update_det_url(img_id, new_url)
+                new_url = f"https://bucket_url/{file_name}"
+                update_det_url(img_id, new_url,session)
                 os.remove(file_name)
 
                 if def_id != -1:
@@ -363,10 +415,10 @@ def draw_img():
                         cv2.putText(single_img, label, text_org, cv2.FONT_HERSHEY_PLAIN, 0.8, (255, 255, 255), 0)
 
                         cv2.imwrite(single_file_name, single_img)
-                        s3.Bucket('xxx').upload_file(single_file_name, single_file_name, ExtraArgs={'ACL': 'public-read'})
+                        s3.Bucket('bucket_name').upload_file(single_file_name, single_file_name, ExtraArgs={'ACL': 'public-read'})
                         uploaded_files.append(single_file_name)
-                        new_url = f"xxx/{single_file_name}"
-                        update_def_url(def_id, new_url)
+                        new_url = f"https://bucket_url/{single_file_name}"
+                        update_def_url(def_id, new_url,session)
                         os.remove(single_file_name)
 
             return jsonify({"code": 0})
@@ -374,24 +426,24 @@ def draw_img():
     except Exception as e:
         # rollback database update
         db.session.rollback()
-
         # rollback the uploaded images
         for file in uploaded_files:
             try:
-                s3.Object('xxx', file).delete()
+                s3.Object('bucket_name', file).delete()
             except Exception as s3_e:
                 app.logger.error(f"Failed to delete S3 object {file}: {s3_e}")
 
         return jsonify({"code": 1})
 
 
-# run when the server start
 with app.app_context():
-
     global detector
-    detector = Detector(model_path='static/faster-rcnn', device_name='cpu',
+    detector = Detector(model_path='model/path', device_name='cpu',
                             device_id=0)
-
+    sqs_thread1 = threading.Thread(target=process_sqs_messages, daemon=True)
+    sqs_thread1.start()
+    sqs_thread2 = threading.Thread(target=process_sqs_messages, daemon=True)
+    sqs_thread2.start()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0',port=5000)

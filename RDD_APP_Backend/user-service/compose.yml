@@ -1,0 +1,6 @@
+services:
+  app_backend:
+    container_name: app_backend_user
+    build: ./
+    ports:
+      - "8081:8081"

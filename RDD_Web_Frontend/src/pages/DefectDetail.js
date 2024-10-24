@@ -122,7 +122,7 @@ function DefectDetail(){
                 if (record.stat !== row.stat) {
                     await defectstore.updateStat(record.id, defectstore.mapStatToNum(row.stat))
                 }
-                if (record.type !== row.type && routerstore.userLevel<2){
+                if (record.type !== row.type && routerstore.level<2){
                     await defectstore.updateType(record.id, defectstore.mapTypeToNum(row.type))
                 }
                 setEditingKey('')
@@ -147,14 +147,14 @@ function DefectDetail(){
                 title: 'Defect Type',
                 dataIndex: 'type',
                 width: '15%',
-                editable: routerstore.userLevel<2,
+                editable: routerstore.level<2,
             },
             {
                 title: 'Status',
                 dataIndex: 'stat',
                 render: (stat) =><Badge status={defectstore.mapStat(stat)} text={stat} />,
                 width: '15%',
-                editable: routerstore.userLevel<3,
+                editable: routerstore.level<3,
             },
             {
                 title: 'Updated By',
@@ -193,7 +193,7 @@ function DefectDetail(){
                         }} onClick={() => edit(record)}>
                             <EditOutlined />Edit
                         </Typography.Link>
-                    <Typography.Link type={'danger'} style={{display:routerstore.userLevel < 2?'inline-block':'none'}} disabled={editingKey !== ''}>
+                    <Typography.Link type={'danger'} style={{display:routerstore.level < 2?'inline-block':'none'}} disabled={editingKey !== ''}>
                         <Popconfirm title="Sure to delete this defect?" onConfirm={()=>defectstore.deleteDefect(record)}>
                             <DeleteOutlined />Delete defect
                         </Popconfirm>

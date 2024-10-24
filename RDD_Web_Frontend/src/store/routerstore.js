@@ -5,12 +5,10 @@ import Home from '../pages/Home.js';
 import Page404 from '../pages/Page404.js';
 import { makeAutoObservable, runInAction } from 'mobx';
 import axios from 'axios';
-import { message } from 'antd';
-import Login from "../pages/Login";
-import userstore from "./userstore";
-import imgstore from "./imgstore";
-import detectionstore from "./detectionstore";
-import defectstore from "./defectstore";
+import Login from "../pages/Login.js";
+import userstore from "./userstore.js";
+import detectionstore from "./detectionstore.js";
+import defectstore from "./defectstore.js";
 import { jwtDecode } from "jwt-decode";
 import { SSMClient, GetParameterCommand } from "@aws-sdk/client-ssm";
 import { instance } from './Axios.js';
@@ -32,15 +30,15 @@ class routerstore {
     code = ''
     url = ''
     client = new SSMClient({
-            region: "xxx",
-            credentials: {
-                accessKeyId: process.env.REACT_APP_ACCESS_KEY_ID,
-                secretAccessKey: process.env.REACT_APP_AWS_SECRET_ACCESS_KEY,
-                sessionToken: process.env.REACT_APP_AWS_SESSION_TOKEN,
-            },
-        });
+        region: "ap-southeast-2",
+        credentials: {
+            accessKeyId: process.env.REACT_APP_ACCESS_KEY_ID,
+            secretAccessKey: process.env.REACT_APP_AWS_SECRET_ACCESS_KEY,
+            sessionToken: process.env.REACT_APP_AWS_SESSION_TOKEN,
+        },
+    });
     async login(code) {
-        const parameter_name = "xxx";
+        const parameter_name = "parameterstore_root";
 
         try {
             const response = await this.client.send(
@@ -58,11 +56,12 @@ class routerstore {
         }
         const formData = new FormData();
         formData.append('code', code);
-        const resp1 = await axios.post(this.url+"/user/token", formData)
+        formData.append('type', 'Web')
+        const resp1 = await axios.post(this.url + "/user/token", formData)
         runInAction(() => {
             this.token = resp1.data.data.token
             localStorage.setItem('token', this.token);
-            localStorage.setItem('access_token',resp1.data.data.access_token)
+            localStorage.setItem('access_token', resp1.data.data.access_token)
         }
         )
     }
@@ -109,12 +108,16 @@ class routerstore {
             }
         }
     }
-    get tokenUrl() { 
-        return this.url+"/user/token"
+    get tokenUrl() {
+        return this.url + "/user/token"
     }
 
+    get level() {
+        localStorage.getItem('token')
+        const decoded = jwtDecode(this.token);
+        return Number(decoded['custom:Level'])
+    }
 
-    
     get userId() {
         if (this.token.length === 0) {
             return 'visitor'
@@ -127,11 +130,8 @@ class routerstore {
             console.error(error)
         }
     }
-    get userLevel() {
-        return userstore.user.level
-    }
-    async getUrl() { 
-        const parameter_name = "xxx";
+    async getUrl() {
+        const parameter_name = "parameterstore_root";
         try {
             const response = await this.client.send(
                 new GetParameterCommand({
@@ -167,12 +167,9 @@ class routerstore {
         this.state = 'pending'
         this.selectkey = '01'
         this.code = ''
-        this.url=''
+        this.url = ''
         userstore.user = {}
         userstore.userList = []
-        imgstore.latitude = 0
-        imgstore.longitude = 0
-        imgstore.presignedUrl = ''
         detectionstore.detectionList = []
         detectionstore.detectionId = 0;
         detectionstore.pageNum = 1

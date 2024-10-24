@@ -1,0 +1,9 @@
+services:
+  app_backend:
+    container_name: app_backend_main
+    build: ./
+    ports:
+      - "8080:8080"
+    volumes:
+      - ~/.aws:/root/.aws:ro
+

@@ -1,12 +1,12 @@
-import {observer} from "mobx-react-lite";
-import React, {useEffect, useState} from 'react';
+import { observer } from "mobx-react-lite";
+import React, { useEffect, useState } from 'react';
 import { PlusOutlined } from '@ant-design/icons';
-import {Flex, Image, message, Upload} from 'antd';
+import { Flex, Image, message, Upload } from 'antd';
 import imgstore from "../store/imgstore";
 import { v4 as uuidv4 } from 'uuid';
 import ExifReader from 'exifreader';
 import routerstore from "../store/routerstore";
-import {runInAction} from "mobx";
+import { runInAction } from "mobx";
 import userstore from "../store/userstore";
 const getBase64 = (file) =>
     new Promise((resolve, reject) => {
@@ -40,8 +40,9 @@ function UploadImg() {
         }
         return true;
     };
-    const handleChange = ({ fileList: newFileList }) => {setFileList(newFileList)
-   }
+    const handleChange = ({ fileList: newFileList }) => {
+        setFileList(newFileList)
+    }
     const handleUpload = async ({ file }) => {
         try {
             const arrayBuffer = await file.arrayBuffer();
@@ -50,21 +51,20 @@ function UploadImg() {
             let latitude = GPSLatitude ? GPSLatitude.description : 0.0;
             let longitude = GPSLongitude ? GPSLongitude.description : 0.0;
             if (GPSLatitudeRef !== undefined || GPSLongitudeRef !== undefined) {
-            latitude = GPSLatitudeRef.description === "North latitude" ? Number(latitude) : -Number(latitude);
-            longitude = GPSLongitudeRef.description === "East longitude" ? Number(longitude) : -Number(longitude);
+                latitude = GPSLatitudeRef.description === "North latitude" ? Number(latitude) : -Number(latitude);
+                longitude = GPSLongitudeRef.description === "East longitude" ? Number(longitude) : -Number(longitude);
             }
-            runInAction(() => {
-                imgstore.latitude = latitude;
-                imgstore.longitude = longitude;
-            });
-
-            const fileName = `${uuidv4()}.jpg`;
-
+            const fileName = `upload/${uuidv4()}.jpg`;
             const params = {
-                Bucket: 'xxx',
+                Bucket: 'bucket_name',
                 Key: fileName,
                 Body: file,
                 ACL: 'public-read',
+                Metadata: {
+                    latitude: latitude.toString(),
+                    longitude: longitude.toString(),
+                    createdBy: routerstore.user,
+                }
             };
 
             await imgstore.Upload(params, file);

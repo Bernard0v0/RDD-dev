@@ -1,6 +1,4 @@
 import { makeAutoObservable, runInAction } from "mobx";
-import axios from "axios";
-import routerstore from "./routerstore";
 import { instance } from "./Axios";
 import { message } from "antd";
 

@@ -13,7 +13,6 @@ function User() {
     useEffect(() => {
 
         routerstore.selectkey = '04'
-        userstore.getUser(localStorage.getItem('access_token'))
       if (!localStorage.getItem('token')) {
 
         confirm()
@@ -21,7 +20,7 @@ function User() {
     }, [])
     const confirm = (e) => {
         routerstore.reset()
-        window.location.href = 'xxx'
+        window.location.href = 'cognito_logout_endpoint'
 };
 
     const items = [

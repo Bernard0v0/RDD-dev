@@ -1,0 +1,38 @@
+
+spring:
+  datasource:
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        url: rds_url
+        username: xxx
+        password: xxx
+  security:
+        oauth2:
+            client:
+                registration:
+                    cognito:
+                        clientId: xxx
+                        clientSecret: xxx
+                        redirect-uri: xxx
+                        authorization-grant-type: authorization_code
+                provider:
+                   cognito:
+                     issuer-uri: xxx
+  data:
+    redis:
+      cluster:
+        nodes: elastic_cache_url
+        max-redirects: 3
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: 100
+  
+
+mybatis:
+    configuration:
+        map-underscore-to-camel-case: true
+        log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+server:
+    port: 8080

@@ -1,0 +1,10 @@
+services:
+  app_frontend:
+    container_name: app_frontend
+    build: ./
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_ACCESS_KEY_ID=xxx
+      - REACT_APP_AWS_SECRET_ACCESS_KEY=xxx
+      - REACT_APP_AWS_SESSION_TOKEN=xxx

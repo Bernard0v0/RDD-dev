@@ -4,7 +4,6 @@ import {Form, Input, message, Modal, Popconfirm, Select, Table, Typography, Radi
 
 import routerstore from "../store/routerstore";
 import userstore from "../store/userstore";
-import defectstore from "../store/defectstore";
 import {
     CloseCircleOutlined,
     DeleteOutlined,
@@ -53,6 +52,7 @@ const EditableCell = ({
 function UserManagement(){
     useEffect(() => {
         routerstore.selectkey = '03'
+        userstore.getUser(localStorage.getItem('access_token'))
         userstore.getUserList()
     }, [])
     const [open, setOpen] = useState(false);
