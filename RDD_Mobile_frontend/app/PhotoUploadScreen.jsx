@@ -14,8 +14,8 @@ import {
   ActivityIndicator,
 } from "react-native";
 import AWS from "aws-sdk";
-import axios from "axios";
-import { getToken } from "../apps/index";
+import { getIdToken } from "../app/index";
+import { jwtDecode } from "jwt-decode";
 
 export default function App() {
   const [facing, setFacing] = useState(CameraType.back);
@@ -26,15 +26,14 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const cameraRef = useRef(null);
 
+  // AWS S3 configuration
   AWS.config.update({
-    accessKeyId: "", // Fill in accordingly
-    secretAccessKey: "", // Fill in accordingly
-    sessionToken: "", // Fill in accordingly
-    region: "", // Fill in accordingly
+    accessKeyId: "XXX",
+    secretAccessKey: "XXX",
+    sessionToken: "XXX",
+    region: "XXX",
   });
   const s3 = new AWS.S3();
-
-  const URL = "http://"; // Change accordingly
 
   if (!permission) {
     // Camera permissions are still loading.
@@ -87,15 +86,22 @@ export default function App() {
   const uploadToS3 = async (uri, fileName, location) => {
     const response = await fetch(uri);
     const blob = await response.blob();
-
+    const token = await getIdToken();
+    const decode = jwtDecode(token);
     const params = {
-      Bucket: "", // Fill in your Bucket name
+      Bucket: "XXX",
       Key: fileName,
       Body: blob,
+      Metadata: {
+        latitude: location.latitude.toString(),
+        longitude: location.longitude.toString(),
+        createdBy: decode["cognito:username"],
+      },
       ACL: "public-read",
     };
 
     const data = await s3.upload(params).promise();
+
     const objectUrl = data.Location;
 
     return {
@@ -112,45 +118,12 @@ export default function App() {
       if (!location) return;
 
       const fileName = photoUri.split("/").pop();
-      const { latitude, longitude, imgSourceUrl } = await uploadToS3(
-        photoUri,
-        fileName,
-        location
-      );
+      console.log(`File name: ${fileName}`);
+      await uploadToS3(photoUri, "upload/" + fileName, location);
 
       setPhotoUri(null);
 
-      const token = await getToken();
-      if (token) {
-        const formEncodedData = new FormData();
-        formEncodedData.append("latitude", latitude);
-        formEncodedData.append("longitude", longitude);
-        formEncodedData.append("imgSourceUrl", imgSourceUrl);
-        try {
-          const response = await axios.post(
-            `${URL}/api/img/update`,
-            formEncodedData,
-            {
-              headers: {
-                Authorization: token,
-              },
-            }
-          );
-          console.log("Response:", response.data);
-          if (response.data.code === 0) {
-            Alert.alert(
-              "Successful Upload",
-              "Your uploaded photo has defect detected!"
-            );
-          } else if (response.data.code === 1) {
-            Alert.alert("Upload failed", `${response.data.message}`);
-          }
-        } catch {
-          console.error("Error in POST request:", error);
-        }
-      } else {
-        console.error("No token found");
-      }
+      Alert.alert("Successful Upload", "Your uploaded photo has been uploaded");
     } catch (error) {
       Alert.alert("Error", "Upload failed. Please try again.");
       console.error(error);
@@ -166,46 +139,16 @@ export default function App() {
       if (!location) return;
 
       for (const photo of selectedPhotos) {
-        const fileName = photo.uri.split("/").pop();
-        const { latitude, longitude, imgSourceUrl } = await uploadToS3(
-          photo.uri,
-          fileName,
-          location
-        );
+        const fileName = photo.uri.split("/").pop(); // Generate a file name based on the URI
+        console.log(`File name: ${fileName}`);
+        await uploadToS3(photo.uri, "upload/" + fileName, location);
 
         setSelectedPhotos([]);
 
-        const token = await getToken();
-        if (token) {
-          const formEncodedData = new FormData();
-          formEncodedData.append("latitude", latitude);
-          formEncodedData.append("longitude", longitude);
-          formEncodedData.append("imgSourceUrl", imgSourceUrl);
-          try {
-            const response = await axios.post(
-              `${URL}/api/img/update`,
-              formEncodedData,
-              {
-                headers: {
-                  Authorization: token,
-                },
-              }
-            );
-            console.log("Response:", response.data);
-            if (response.data.code === 0) {
-              Alert.alert(
-                "Successful Upload",
-                "Your uploaded photo has defect detected!"
-              );
-            } else if (response.data.code === 1) {
-              Alert.alert("Upload failed", `${response.data.message}`);
-            }
-          } catch (error) {
-            console.error("Error in POST request:", error);
-          }
-        } else {
-          console.error("No token found");
-        }
+        Alert.alert(
+          "Successful Upload",
+          "Your uploaded photo has been uploaded"
+        );
       }
     } catch (error) {
       Alert.alert("Error", "Upload failed. Please try again.");
@@ -258,7 +201,7 @@ export default function App() {
                   <Image
                     key={index}
                     source={{ uri: photo.uri }}
-                    style={styles.multiPreview}
+                    style={styles.multiPreview} // set preview style for multiple photos
                   />
                 ))}
               </View>

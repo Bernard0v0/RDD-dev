@@ -1,43 +1,28 @@
-import React, { useState } from "react";
-import {
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-} from "react-native";
-import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import React, { useState, useEffect } from "react";
+import { Text, View, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { WebView } from "react-native-webview";
 import { useRouter } from "expo-router";
-import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
 
-export const login = async (username, password) => {
-  const formData = new FormData();
-  formData.append("name", username);
-  formData.append("password", password);
+const COGNITO_HOSTED_UI_URL = "XXX";
 
-  const URL = "http://"; // Change accordingly
-
-  const response = await axios.post(`${URL}/user/login`, formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
-
-  const token = response.data.data;
-
-  if (!token) {
-    throw new Error("Token is null or undefined");
+export const getAccessToken = async () => {
+  try {
+    const token = await AsyncStorage.getItem("access_token");
+    if (token !== null) {
+      return token;
+    }
+    console.log("No token found");
+  } catch (e) {
+    console.error("Failed to fetch the token", e);
   }
-
-  await AsyncStorage.setItem("jwtToken", token);
-  return response.data;
+  return null;
 };
 
-export const getToken = async () => {
+export const getIdToken = async () => {
   try {
-    const token = await AsyncStorage.getItem("jwtToken");
+    const token = await AsyncStorage.getItem("id_token");
     if (token !== null) {
       return token;
     }
@@ -49,71 +34,65 @@ export const getToken = async () => {
 };
 
 export default function Index() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [secureTextEntry, setSecureTextEntry] = useState(true);
+  const [showWebView, setShowWebView] = useState(false);
   const router = useRouter();
 
-  const validateInputs = async () => {
-    if (!email) {
-      Alert.alert("Error", "Please enter your username");
-      return;
-    }
+  const handleLoginRedirect = async (data) => {
+    const url = data.url;
 
-    if (!password) {
-      Alert.alert("Error", "Please enter your password");
-      return;
-    }
+    // Check if the URL is the callback URL
+    if (url.startsWith("XXX")) {
+      // Parse the query string to extract the 'code' parameter
+      const params = new URLSearchParams(url.split("?")[1]);
+      const code = params.get("code");
 
-    try {
-      await login(email, password);
-      const token = await getToken();
-      console.log("Retrieved Token:", token);
+      if (!code) {
+        Alert.alert("Error", "Authorization code not found in redirect");
+        return;
+      }
 
-      router.push("/PhotoUploadScreen");
-    } catch (error) {
-      console.error("Error during login or token retrieval:", error);
-      Alert.alert("Login failed", "Invalid credentials or server error");
+      try {
+        const formEncodedData = new FormData();
+        formEncodedData.append("code", code);
+        formEncodedData.append("type", "mobile");
+        const response = await axios.post("XXX", formEncodedData);
+        const access_token = response.data.data.access_token;
+        const id_token = response.data.data.token;
+        // Store the token securely in AsyncStorage
+        await AsyncStorage.setItem("access_token", access_token);
+        await AsyncStorage.setItem("id_token", id_token);
+
+        // Redirect user to another screen after successful login
+        router.push("/PhotoUploadScreen");
+      } catch (error) {
+        console.error("Error exchanging code for tokens:", error);
+        Alert.alert("Error", "Failed to retrieve tokens");
+      }
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>LOGIN</Text>
-
-      <Text style={styles.label}>Username</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Please write your email"
-        value={email}
-        onChangeText={setEmail}
-      />
-
-      <Text style={styles.label}>Password</Text>
-      <View style={styles.passwordContainer}>
-        <TextInput
-          style={styles.passwordInput}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={secureTextEntry}
+      {showWebView ? (
+        <WebView
+          originWhitelist={["*"]}
+          source={{ uri: COGNITO_HOSTED_UI_URL }}
+          onNavigationStateChange={handleLoginRedirect}
+          onError={() => setShowWebView(false)}
+          style={styles.webview}
         />
-        <TouchableOpacity onPress={() => setSecureTextEntry(!secureTextEntry)}>
-          <Icon
-            name={secureTextEntry ? "eye-off" : "eye"}
-            size={20}
-            color="gray"
-          />
-        </TouchableOpacity>
-      </View>
+      ) : (
+        <>
+          <Text style={styles.title}>LOGIN</Text>
 
-      <TouchableOpacity>
-        <Text style={styles.forgotPassword}>Forgot password</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.loginButton} onPress={validateInputs}>
-        <Text style={styles.loginButtonText}>LOGIN</Text>
-      </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={() => setShowWebView(true)}
+          >
+            <Text style={styles.loginButtonText}>LOGIN WITH COGNITO</Text>
+          </TouchableOpacity>
+        </>
+      )}
     </View>
   );
 }
@@ -124,41 +103,14 @@ const styles = StyleSheet.create({
     padding: 20,
     justifyContent: "center",
   },
+  webview: {
+    flex: 1,
+  },
   title: {
     fontSize: 24,
     fontWeight: "bold",
     color: "#D87042",
     marginBottom: 40,
-  },
-  label: {
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#D87042",
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 20,
-    fontSize: 16,
-  },
-  passwordContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#D87042",
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 20,
-  },
-  passwordInput: {
-    flex: 1,
-    fontSize: 16,
-  },
-  forgotPassword: {
-    color: "gray",
-    marginBottom: 40,
-    alignSelf: "flex-end",
   },
   loginButton: {
     backgroundColor: "#D87042",
