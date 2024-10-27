@@ -1,2 +1,2 @@
 # RDD-dev
-Please refer to each folder intro.md
+ <img src="/arch2.png" width="600"/>
